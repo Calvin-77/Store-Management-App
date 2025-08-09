@@ -4,6 +4,8 @@ import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import { Table, Row } from 'react-native-table-component';
 import BackIcon from '../components/BackIcon';
+import ReactNativeBlobUtil from 'react-native-blob-util';
+import createExcelItemStocks from '../tools/creatExcelItemStocks'
 
 const ItemStocks = ({ route }) => {
   const { role } = route.params || {};
@@ -13,6 +15,15 @@ const ItemStocks = ({ route }) => {
   const [loading, setLoading] = useState(true);
   const [editingRowId, setEditingRowId] = useState(null);
   const [editableRowData, setEditableRowData] = useState({});
+  const [pageColor, setPageColor] = useState('#f0fdf4');
+
+  useEffect(() => {
+    if (role === '1') {
+      setPageColor('#e6f9ed');
+    } else if (role === '2') {
+      setPageColor('#f3e8ff');
+    }
+  }, [role]);
 
   useEffect(() => {
     fetchData();
@@ -64,19 +75,36 @@ const ItemStocks = ({ route }) => {
     navigation.navigate("Home");
   };
 
+  const handleDownload = async () => {
+    try {
+
+      const today = new Date().toISOString().split('T')[0];
+      const excelBase64 = createExcelItemStocks(data, place);
+      const documentsPath = ReactNativeBlobUtil.fs.dirs.DocumentDir;
+      const fileName = `StokBarang-${place} (per tanggal ${today}).xlsx`
+      const finalPath = `${documentsPath}/${fileName}`;
+
+      await ReactNativeBlobUtil.fs.writeFile(finalPath, excelBase64, 'base64');
+
+      Alert.alert("Success", `File located at: [${finalPath}]`)
+    } catch (error) {
+      console.log(`Error ${error}`)
+    }
+  };
+
   const tableHead = ['ID', 'SKU', 'Nama', 'Deskripsi', 'Harga Beli', 'Harga Jual', 'Stok', 'Min. Stock', 'Action'];
   const widthArr = [50, 80, 200, 250, 135, 135, 150, 88, 150];
 
   if (loading) {
     return (
-      <View style={[styles.pageContainer, { justifyContent: 'center' }]}>
+      <View style={[styles.pageContainer, { justifyContent: 'center', backgroundColor: pageColor }]}>
         <ActivityIndicator size="large" color="#63b3ed" />
       </View>
     );
   }
 
   return (
-    <View style={styles.pageContainer}>
+    <View style={[styles.pageContainer, { backgroundColor: pageColor }]}>
       <TouchableOpacity onPress={handleBack} style={styles.backButton}>
         <BackIcon />
       </TouchableOpacity>
@@ -183,6 +211,9 @@ const ItemStocks = ({ route }) => {
           </Table>
         </View>
       </ScrollView>
+      <TouchableOpacity onPress={handleDownload} style={styles.downloadButton}>
+          <Text style={{ color: '#dcfce7' }}>Download xlsx</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -202,7 +233,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#166534',
+    color: '#1a365d',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -214,7 +245,7 @@ const styles = StyleSheet.create({
     margin: 0,
     textAlign: 'center',
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#ddff00ff',
   },
   tableRow: {
     backgroundColor: '#ffffff',
@@ -227,13 +258,14 @@ const styles = StyleSheet.create({
   tableRowText: {
     margin: 10,
     textAlign: 'center',
-    color: '#000000ff',
+    color: '#1a365d',
   },
   stockCellContainer: {
     paddingVertical: 10,
   },
   boldText: {
     fontWeight: 'bold',
+    color: '#1a365d',
   },
   inputCell: {
     height: 40,
@@ -276,5 +308,12 @@ const styles = StyleSheet.create({
   lowStock: {
     backgroundColor: '#ff0000c9',
     color: '#ffffff'
+  },
+  downloadButton: {
+    width: '100%',
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'green',
   },
 });

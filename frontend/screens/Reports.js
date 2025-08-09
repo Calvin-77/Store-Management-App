@@ -1,5 +1,5 @@
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigation } from '@react-navigation/native'
 import BackIcon from '../components/BackIcon';
 
@@ -13,6 +13,18 @@ const data = [
 const Reports = ({ route }) => {
     const { role } = route.params || {};
     const navigation = useNavigation();
+    const [pageColor, setPageColor] = useState('#fef3c7');
+    const [gridColor, setGridColor] = useState({ backgroundColor: '#d1fae5', borderColor: '#34d399' });
+
+    useEffect(() => {
+        if (role === '1') {
+            setPageColor('#e6f9ed');
+            setGridColor({ backgroundColor: '#d1fae5', borderColor: '#34d399' });
+        } else if (role === '2') {
+            setPageColor('#f3e8ff');
+            setGridColor({ backgroundColor: '#ede9fe', borderColor: '#a5b4fc' });
+        }
+    }, [role]);
 
     const handleBack = () => {
         navigation.navigate("Home");
@@ -28,14 +40,14 @@ const Reports = ({ route }) => {
         };
 
         return (
-            <TouchableOpacity style={styles.gridItem} onPress={handlePress}>
+            <TouchableOpacity style={[styles.gridItem, gridColor]} onPress={handlePress}>
                 <Text style={styles.gridItemText}>{item.title}</Text>
             </TouchableOpacity>
         );
     };
 
     return (
-        <View style={styles.pageContainer}>
+        <View style={[styles.pageContainer, { backgroundColor: pageColor }]}>
             <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                 <BackIcon />
             </TouchableOpacity>
@@ -68,7 +80,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#92400e',
+        color: '#1a365d',
         marginBottom: 20,
         textAlign: 'center',
     },
@@ -97,7 +109,7 @@ const styles = StyleSheet.create({
     gridItemText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#92400e',
+        color: '#1a365d',
         textAlign: 'center',
         paddingHorizontal: 8,
     },

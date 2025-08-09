@@ -4,6 +4,8 @@ import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import { Table, Row } from 'react-native-table-component';
 import BackIcon from '../components/BackIcon';
+import ReactNativeBlobUtil from 'react-native-blob-util';
+import createExcelAccounts from '../tools/createExcelAccounts';
 
 const Accounts = ({ route }) => {
   const { role } = route.params || {};
@@ -12,6 +14,15 @@ const Accounts = ({ route }) => {
   const [loading, setLoading] = useState(true);
   const [editingRowId, setEditingRowId] = useState(null);
   const [editableRowData, setEditableRowData] = useState({});
+  const [pageColor, setPageColor] = useState('#f7fafc');
+
+  useEffect(() => {
+    if (role === '1') {
+      setPageColor('#e6f9ed');
+    } else if (role === '2') {
+      setPageColor('#f3e8ff');
+    }
+  }, [role]);
 
   useEffect(() => {
     fetchData();
@@ -32,19 +43,37 @@ const Accounts = ({ route }) => {
     navigation.navigate("Home");
   };
 
+  const handleDownload = async () => {
+    try {
+      const place = role === '1' ? 'Toko' : 'Gudang';
+      const today = new Date().toISOString().split('T')[0];
+      const excelBase64 = createExcelAccounts(data, place);
+      const documentsPath = ReactNativeBlobUtil.fs.dirs.DocumentDir;
+      const fileName = `UtangPiutang-${place} (per tanggal ${today}).xlsx`;
+      const finalPath = `${documentsPath}/${fileName}`;
+
+      await ReactNativeBlobUtil.fs.writeFile(finalPath, excelBase64, 'base64');
+
+      Alert.alert('Success', `File located at: [${finalPath}]`);
+    } catch (error) {
+      console.error('Error exporting accounts excel:', error);
+      Alert.alert('Error', 'Failed to save file.');
+    }
+  };
+
   const tableHead = ['ID', 'Nama', 'Tipe', 'Deskripsi', 'Total Tagihan', 'Sisa Tagihan', 'Tanggal Transaksi', 'Jatuh Tempo', 'Status', 'Catatan', 'Created At', 'Updated At'];
   const widthArr = [50, 100, 80, 150, 135, 135, 100, 100, 80, 110, 95, 95];
 
   if (loading) {
     return (
-      <View style={[styles.pageContainer, { justifyContent: 'center' }]}>
+      <View style={[styles.pageContainer, { justifyContent: 'center', backgroundColor: pageColor }]}>
         <ActivityIndicator size="large" color="#63b3ed" />
       </View>
     );
   }
 
   return (
-    <View style={styles.pageContainer}>
+    <View style={[styles.pageContainer, { backgroundColor: pageColor }]}>
       <TouchableOpacity onPress={handleBack} style={styles.backButton}>
         <BackIcon />
       </TouchableOpacity>
@@ -103,6 +132,9 @@ const Accounts = ({ route }) => {
           })}
         </Table>
       </ScrollView>
+      <TouchableOpacity onPress={handleDownload} style={styles.downloadButton}>
+        <Text style={{ color: '#dcfce7' }}>Download xlsx</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -122,7 +154,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#2d3748',
+    color: '#1a365d',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -134,7 +166,7 @@ const styles = StyleSheet.create({
     margin: 0,
     textAlign: 'center',
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#ddff00ff',
   },
   tableRow: {
     borderWidth: 0.3,
@@ -143,7 +175,7 @@ const styles = StyleSheet.create({
   tableRowText: {
     margin: 10,
     textAlign: 'center',
-    color: '#2d3748',
+    color: '#1a365d',
   },
   statusColor_1: {
     backgroundColor: '#48bb78'
@@ -152,5 +184,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#f7fafc'
   }, statusColor_3: {
     backgroundColor: '#f56565'
+  },
+  downloadButton: {
+    width: '100%',
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'green',
   }
 });

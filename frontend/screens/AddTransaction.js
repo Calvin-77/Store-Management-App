@@ -7,9 +7,6 @@ import axios from 'axios';
 import BackIcon from '../components/BackIcon';
 import { useModal } from '../context/ModalContext';
 import { Calendar } from 'react-native-calendars';
-import { LogBox } from 'react-native';
-
-LogBox.ignoreAllLogs();
 
 const postTransaction = async (transactionData) => {
     try {
@@ -55,7 +52,6 @@ const postAccount = async (accountData) => {
 
 const Option_1 = ({ type, selectedProductId, setSelectedProductId, quantity, setQuantity, description, setDescription, products, value, onChangeText, editable, sellingPrice, setSellingPrice, updateProducts, selectedUnit, setSelectedUnit, availableUnits }) => {
     const [productOpen, setProductOpen] = useState(false);
-    const [unitOpen, setUnitOpen] = useState(false);
     const [items, setItems] = useState([]);
     const { showModal, hideModal } = useModal();
 
@@ -128,20 +124,21 @@ const Option_1 = ({ type, selectedProductId, setSelectedProductId, quantity, set
                 </View>
                 <View style={{ width: 130, marginLeft: 10 }}>
                     <Text style={styles.formTitle}>Unit</Text>
-                    <DropDownPicker
-                        open={unitOpen}
-                        value={selectedUnit}
-                        items={availableUnits}
-                        setOpen={setUnitOpen}
-                        setValue={setSelectedUnit}
-                        placeholder="Unit"
-                        style={styles.inputBox}
-                        dropDownContainerStyle={styles.inputBox}
+                    <TouchableOpacity
                         disabled={!selectedProductId || availableUnits.length === 0}
-                        disabledStyle={{ backgroundColor: '#f1f5f9' }}
-                        zIndex={2000}
-                        zIndexInverse={2000}
-                    />
+                        onPress={() => {
+                            if (!selectedProductId || availableUnits.length === 0) return;
+                            const values = availableUnits.map(u => (typeof u === 'string' ? u : u.value));
+                            const currentIndex = values.indexOf(selectedUnit);
+                            const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % values.length;
+                            setSelectedUnit(values[nextIndex]);
+                        }}
+                        style={[styles.inputBox, (!selectedProductId || availableUnits.length === 0) && styles.disabledInput, { justifyContent: 'center' }]}
+                    >
+                        <Text style={{ textAlign: 'center', color: '#1e293b', fontSize: 16 }}>
+                            {selectedUnit || 'Unit'}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -212,7 +209,7 @@ const Option_2 = ({ type, nameId, setNameId, name, setName, names, description, 
                         <Text style={styles.formTitle}>Jatuh Tempo</Text>
                         <Calendar style={styles.calendar} onDayPress={(day) => {
                             if (day.dateString < new Date().toISOString().split('T')[0]) {
-                                return Alert.alert("Error", "Tanggal jatuh tempo tidak boleh sebelum hari ini.");
+                                return Alert.alert("Error", "Due date cannot be before today.");
                             }
                             setSelectedDate(day.dateString);
                         }} markedDates={{ [selectedDate]: { selected: true, disableTouchEvent: true, selectedColor: '#2563eb' } }} />
@@ -381,74 +378,88 @@ const AddTransaction = ({ route }) => {
         }
     }, [type]);
 
+    // Tambahkan state untuk warna berdasarkan role
+    const [pageColor, setPageColor] = useState('#f0f9ff');
+    const [formColor, setFormColor] = useState('#ffffff');
+
+    useEffect(() => {
+        if (role === '1') {
+            setPageColor('#e6f9ed'); // Toko hijau
+            setFormColor('#c6f6d5');
+        } else if (role === '2') {
+            setPageColor('#f3e8ff'); // Gudang ungu
+            setFormColor('#e9d5ff');
+        }
+    }, [role]);
+
     const handleBack = () => {
         navigation.goBack();
     }
 
     const handleSubmit = async () => {
         if (!type) {
-            Alert.alert("Lengkapi Form", "Mohon pilih Jenis Transaksi terlebih dahulu.");
+            Alert.alert("Incomplete Form", "Please select the Transaction Type first.");
             return;
         }
 
         if (type === 'Stok Masuk' || type === 'Penjualan' || type === 'Pindah Stok Barang') {
             if (!selectedProductId) {
-                Alert.alert("Lengkapi Form", "Mohon pilih Barang terlebih dahulu.");
+                Alert.alert("Incomplete Form", "Please select a Product first.");
                 return;
             }
             if (!quantity || parseFloat(quantity) <= 0) {
-                Alert.alert("Lengkapi Form", "Mohon isi Kuantitas dengan nilai yang valid.");
+                Alert.alert("Incomplete Form", "Please enter a valid Quantity.");
                 return;
             }
             if (!selectedUnit) {
-                Alert.alert("Lengkapi Form", "Mohon pilih Unit.");
+                Alert.alert("Incomplete Form", "Please select a Unit.");
                 return;
             }
             if (!description.trim()) {
-                Alert.alert("Lengkapi Form", "Mohon isi Keterangan.");
+                Alert.alert("Incomplete Form", "Please enter a Description.");
                 return;
             }
             if (type === 'Penjualan' && (!sellingPrice || parseFloat(sellingPrice) <= 0)) {
-                Alert.alert("Lengkapi Form", "Mohon isi Harga Jual dengan nilai yang valid.");
+                Alert.alert("Incomplete Form", "Please enter a valid Selling Price.");
                 return;
             }
         } else if (type === 'Utang' || type === 'Piutang') {
             if (!name.trim()) {
-                Alert.alert("Lengkapi Form", "Mohon isi Nama.");
+                Alert.alert("Incomplete Form", "Please enter a Name.");
                 return;
             }
             if (!description.trim()) {
-                Alert.alert("Lengkapi Form", "Mohon isi Keterangan.");
+                Alert.alert("Incomplete Form", "Please enter a Description.");
                 return;
             }
             if (!nominal || parseFloat(nominal) <= 0) {
-                Alert.alert("Lengkapi Form", "Mohon isi Nominal dengan nilai yang valid.");
+                Alert.alert("Incomplete Form", "Please enter a valid Amount.");
                 return;
             }
             if (!selectedDate) {
-                Alert.alert("Lengkapi Form", "Mohon pilih Tanggal Jatuh Tempo.");
+                Alert.alert("Incomplete Form", "Please select a Due Date.");
                 return;
             }
         } else if (type === 'Pembayaran Utang' || type === 'Pembayaran Piutang') {
             if (!nameId) {
-                Alert.alert("Lengkapi Form", "Mohon pilih Nama.");
+                Alert.alert("Incomplete Form", "Please select a Name.");
                 return;
             }
             if (!description.trim()) {
-                Alert.alert("Lengkapi Form", "Mohon isi Keterangan.");
+                Alert.alert("Incomplete Form", "Please enter a Description.");
                 return;
             }
             if (!nominal || parseFloat(nominal) <= 0) {
-                Alert.alert("Lengkapi Form", "Mohon isi Nominal dengan nilai yang valid.");
+                Alert.alert("Incomplete Form", "Please enter a valid Amount.");
                 return;
             }
         } else if (type === 'Modal' || type === 'Beban Gaji Staff' || type === 'Beban Bonus Staff' || type === 'Uang Makan Staff' || type === 'Perlengkapan' || type === 'Peralatan' || type === 'Biaya Lain Lain') {
             if (!description.trim()) {
-                Alert.alert("Lengkapi Form", "Mohon isi Keterangan.");
+                Alert.alert("Incomplete Form", "Please enter a Description.");
                 return;
             }
             if (!nominal || parseFloat(nominal) <= 0) {
-                Alert.alert("Lengkapi Form", "Mohon isi Nominal dengan nilai yang valid.");
+                Alert.alert("Incomplete Form", "Please enter a valid Amount.");
                 return;
             }
         }
@@ -491,9 +502,9 @@ const AddTransaction = ({ route }) => {
                 await postTransaction(stokKeluar);
             }
             else if (type === 'Stok Masuk') {
-                if (!selectedProduct) return Alert.alert("Error", "Silakan pilih produk terlebih dahulu.");
-                if (!selectedUnit) return Alert.alert("Error", "Silakan pilih unit barang.");
-                if (!quantity || parseInt(quantity) <= 0) return Alert.alert("Error", "Kuantitas tidak valid.");
+                if (!selectedProduct) return Alert.alert("Error", "Please select a product first.");
+                if (!selectedUnit) return Alert.alert("Error", "Please select a unit.");
+                if (!quantity || parseInt(quantity) <= 0) return Alert.alert("Error", "Invalid quantity.");
                 await updateProductStock(selectedProductId, parseInt(quantity), selectedUnit, role);
                 await postTransaction(transactionData);
             } else if (type === 'Utang' || type === 'Piutang') {
@@ -517,7 +528,7 @@ const AddTransaction = ({ route }) => {
                 if (selectedAccount.sisa_tagihan - nominal >= 0) {
                     await updateAccounts(nameId, nominal);
                 } else {
-                    return Alert.alert("Pembayaran melewati jumlah tagihan.", "Sisa tagihan saat ini: " + selectedAccount.sisa_tagihan);
+                    return Alert.alert("Error", "Payment exceeds the outstanding amount.", [{ text: 'OK' }]);
                 }
                 await postTransaction(transactionData);
             } else if (type === 'Modal' || type === 'Beban Gaji Staff' || type === 'Beban Bonus Staff' || type === 'Uang Makan Staff' || type === 'Perlengkapan' || type === 'Peralatan' || type === 'Biaya Lain Lain') {
@@ -528,7 +539,7 @@ const AddTransaction = ({ route }) => {
                 const availableStock = productToMove.stock_levels?.[fromPlace]?.[selectedUnit] || 0;
 
                 if (parseFloat(quantity) > availableStock) {
-                    return Alert.alert("Error", `Stok tidak mencukupi. Stok ${selectedUnit} yang tersedia di ${fromPlace} hanya ${availableStock}.`);
+                    return Alert.alert("Error", `Insufficient stock. Available ${selectedUnit} in ${fromPlace}: ${availableStock}.`);
                 }
 
                 const toPlace = fromPlace === 'Toko' ? 'Gudang' : 'Toko';
@@ -552,7 +563,7 @@ const AddTransaction = ({ route }) => {
     };
 
     return (
-        <View style={styles.pageContainer}>
+        <View style={[styles.pageContainer, { backgroundColor: pageColor }]}>
             <ScrollView>
                 <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                     <BackIcon />
@@ -648,7 +659,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#1e3a8a',
+        color: '#1a365d',
         marginTop: 10,
         marginBottom: 20,
     },
@@ -658,7 +669,7 @@ const styles = StyleSheet.create({
     formTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#1e40af',
+        color: '#1a365d',
         marginBottom: 8,
         marginTop: 12,
     },

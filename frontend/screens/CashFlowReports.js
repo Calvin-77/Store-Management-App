@@ -1,10 +1,11 @@
 import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, FlatList } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import createPdfCashFlow from '../tools/createPdfCashFlow';
+import createExcelCashFlow from '../tools/createExcelCashFlow';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import BackIcon from '../components/BackIcon';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const formatDateToYyyyMmDd = (date) => {
     const year = date.getFullYear();
@@ -42,6 +43,16 @@ const CashFlowReports = ({ route }) => {
     const [startDate, setStartDate] = useState(getMonthDateRange().startDate);
     const [endDate, setEndDate] = useState(getMonthDateRange().endDate);
 
+    const [pageColor, setPageColor] = useState('#ecfdf5');
+
+    useEffect(() => {
+        if (currentRole === '1') {
+            setPageColor('#e6f9ed'); // Toko hijau
+        } else if (currentRole === '2') {
+            setPageColor('#f3e8ff'); // Gudang ungu
+        }
+    }, [currentRole]);
+
     const fetchExistingReports = async () => {
         setLoading(true);
         setError(null);
@@ -72,13 +83,13 @@ const CashFlowReports = ({ route }) => {
             const reportData = response.data;
 
             const periode = { place, startDate, endDate };
-            const pdfRawString = createPdfCashFlow(reportData, periode);
+            const excelBase64 = createExcelCashFlow(reportData, periode);
 
-            const documentsPath = ReactNativeBlobUtil.fs.dirs.DownloadDir;
-            const fileName = `ArusKas-${periode.place}-${periode.endDate}.pdf`;
+            const documentsPath = ReactNativeBlobUtil.fs.dirs.DocumentDir;
+            const fileName = `ArusKas-Bulanan-${periode.place} (${periode.startDate} hingga ${periode.endDate}).xlsx`;
             const finalPath = `${documentsPath}/${fileName}`;
 
-            await ReactNativeBlobUtil.fs.writeFile(finalPath, pdfRawString, 'utf8');
+            await ReactNativeBlobUtil.fs.writeFile(finalPath, excelBase64, 'base64');
             setSavedFilePath(finalPath);
 
             await axios.post('http://localhost:3000/reports/reports', {
@@ -96,9 +107,9 @@ const CashFlowReports = ({ route }) => {
                 setError(err.response?.data?.message || "Laporan untuk periode ini sudah ada.");
                 fetchExistingReports();
             } else {
-                const errorMessage = err.response?.data?.message || err.message || 'Terjadi kesalahan tidak diketahui.';
+                const errorMessage = err.response?.data?.message || err.message || 'Unknown error occurred.';
                 setError(errorMessage);
-                Alert.alert('Gagal', errorMessage);
+                Alert.alert('Error', errorMessage);
             }
         } finally {
             setLoading(false);
@@ -106,7 +117,19 @@ const CashFlowReports = ({ route }) => {
     };
 
     useEffect(() => {
-        handleCreateReport();
+        const checkFetchStatus = async () => {
+            let today = new Date().toISOString().split('T')[0];
+            let fetchStatus = await AsyncStorage.getItem('cashFlow');
+            
+            if (fetchStatus !== today) {
+                handleCreateReport();
+                
+                await AsyncStorage.setItem('cashFlow', today);
+            }
+        };
+        
+        fetchExistingReports();
+        checkFetchStatus();
     }, []);
 
     const renderReportItem = ({ item }) => {
@@ -123,7 +146,7 @@ const CashFlowReports = ({ route }) => {
     };
 
     return (
-        <View style={styles.pageContainer}>
+        <View style={[styles.pageContainer, { backgroundColor: pageColor }]}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate("Reports", { role: currentRole })}>
                 <BackIcon />
             </TouchableOpacity>
@@ -160,7 +183,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#065f46',
+        color: '#1a365d',
         textAlign: 'center',
         marginTop: 40,
         marginBottom: 20,
@@ -181,13 +204,13 @@ const styles = StyleSheet.create({
     },
     infoText: {
         fontSize: 14,
-        color: '#065f46',
+        color: '#1a365d',
         textAlign: 'center',
         marginVertical: 15,
     },
     errorText: {
         fontSize: 14,
-        color: '#dc2626',
+        color: '#1a365d',
         textAlign: 'center',
         marginVertical: 10,
     },
@@ -210,6 +233,6 @@ const styles = StyleSheet.create({
     },
     reportText: {
         fontSize: 14,
-        color: '#065f46',
+        color: '#1a365d',
     },
 });

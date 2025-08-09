@@ -11,6 +11,9 @@ import ProfitLossReports from './screens/ProfitLossReports';
 import CashFlowReports from './screens/CashFlowReports';
 import BalanceSheets from './screens/BalanceSheets';
 import Recaps from './screens/Recaps';
+import { LogBox } from 'react-native';
+
+LogBox.ignoreAllLogs();
 
 const Stack = createNativeStackNavigator();
 

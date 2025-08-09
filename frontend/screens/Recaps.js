@@ -1,10 +1,11 @@
 import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, FlatList } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import createPdfRecaps from '../tools/createPdfRecaps';
+import createExcelRecaps from '../tools/createExcelRecaps';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import BackIcon from '../components/BackIcon';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const getDateRangeForPeriod = (period) => {
   const today = new Date();
@@ -18,12 +19,21 @@ const getDateRangeForPeriod = (period) => {
       endDate = yesterday;
       break;
     case 'week':
-      const lastDayOfWeek = new Date(today);
-      const firstDayOfWeek = new Date(today);
-      firstDayOfWeek.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay() + (firstDayOfWeek.getDay() == 0 ? -6 : 1) - 7);
-      lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
-      startDate = firstDayOfWeek;
-      endDate = lastDayOfWeek;
+      const todayForWeek = new Date();
+      const dayIndex = todayForWeek.getDay();
+      const offsetToThisMonday = dayIndex === 0 ? 6 : dayIndex - 1;
+
+      const thisMonday = new Date();
+      thisMonday.setDate(todayForWeek.getDate() - offsetToThisMonday);
+
+      const lastSunday = new Date(thisMonday);
+      lastSunday.setDate(thisMonday.getDate() - 1);
+      
+      const lastMonday = new Date(lastSunday);
+      lastMonday.setDate(lastSunday.getDate() - 6);
+
+      startDate = lastMonday;
+      endDate = lastSunday;
       break;
     case 'year':
       startDate = new Date(today.getFullYear() - 1, 0, 1);
@@ -64,6 +74,15 @@ const Recaps = ({ route }) => {
   const [groupBy, setGroupBy] = useState('month');
   const [startDate, setStartDate] = useState(getDateRangeForPeriod('month').startDate);
   const [endDate, setEndDate] = useState(getDateRangeForPeriod('month').endDate);
+  const [pageColor, setPageColor] = useState('#ede9e3');
+
+  useEffect(() => {
+    if (currentRole === '1') {
+      setPageColor('#e6f9ed'); // Toko hijau
+    } else if (currentRole === '2') {
+      setPageColor('#f3e8ff'); // Gudang ungu
+    }
+  }, [currentRole]);
 
   useEffect(() => {
     const newRange = getDateRangeForPeriod(groupBy);
@@ -132,27 +151,27 @@ const Recaps = ({ route }) => {
         endDate: endDateParam,
         groupBy: groupByParam
       };
-      const pdfRawString = createPdfRecaps(reportData, periode);
+      const excelBase64 = createExcelRecaps(reportData, periode);
 
-      const documentsPath = ReactNativeBlobUtil.fs.dirs.DownloadDir;
+      const documentsPath = ReactNativeBlobUtil.fs.dirs.DocumentDir;
       let fileName;
       switch (periode.groupBy) {
         case 'day':
-          fileName = `Rekap-Harian-${periode.place}-${periode.endDate}.pdf`;
+          fileName = `Rekap-Harian-${periode.place} (tanggal ${periode.endDate}).xlsx`;
           break;
         case 'week':
-          fileName = `Rekap-Mingguan-${periode.place}-${periode.startDate}-${periode.endDate}.pdf`;
+          fileName = `Rekap-Mingguan-${periode.place} (${periode.startDate} hingga ${periode.endDate}).xlsx`;
           break;
         case 'month':
-          fileName = `Rekap-Bulanan-${periode.place}-${periode.startDate}-${periode.endDate}.pdf`;
+          fileName = `Rekap-Bulanan-${periode.place} (${periode.startDate} hingga ${periode.endDate}).xlsx`;
           break;
         case 'year':
-          fileName = `Rekap-Tahunan-${periode.place}-${periode.startDate}-${periode.endDate}.pdf`;
+          fileName = `Rekap-Tahunan-${periode.place} (${periode.startDate} hingga ${periode.endDate}).xlsx`;
           break;
       }
       const finalPath = `${documentsPath}/${fileName}`;
 
-      await ReactNativeBlobUtil.fs.writeFile(finalPath, pdfRawString, 'utf8');
+      await ReactNativeBlobUtil.fs.writeFile(finalPath, excelBase64, 'base64');
 
       await axios.post('http://localhost:3000/reports/reports', {
         report_type: 'recap',
@@ -192,7 +211,19 @@ const Recaps = ({ route }) => {
       await fetchExistingReports();
     };
 
-    createInitialReports();
+    const checkFetchStatus = async () => {
+      let today = new Date().toISOString().split('T')[0];
+      let fetchStatus = await AsyncStorage.getItem('recaps');
+
+      if (fetchStatus !== today) {
+        createInitialReports();
+        
+        await AsyncStorage.setItem('recaps', today);
+      }
+    };
+    
+    fetchExistingReports();
+    checkFetchStatus();
   }, []);
 
   const renderReportItem = ({ item }) => (
@@ -211,7 +242,7 @@ const Recaps = ({ route }) => {
   );
 
   return (
-    <View style={styles.pageContainer}>
+    <View style={[styles.pageContainer, { backgroundColor: pageColor }]}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate("Reports", { role: currentRole })}>
         <BackIcon />
       </TouchableOpacity>
@@ -294,7 +325,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#7c3aed',
+    color: '#1a365d',
     textAlign: 'center',
     marginTop: 40,
     marginBottom: 20,
@@ -302,24 +333,24 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6b21a8',
+    color: '#1a365d',
     marginBottom: 10,
   },
   infoText: {
     fontSize: 14,
-    color: '#6b21a8',
+    color: '#1a365d',
     textAlign: 'center',
     marginBottom: 15,
   },
   errorText: {
     fontSize: 14,
-    color: '#dc2626',
+    color: '#1a365d',
     textAlign: 'center',
     marginVertical: 10,
   },
   reportText: {
     fontSize: 14,
-    color: '#7c3aed',
+    color: '#1a365d',
   },
   pathTextSmall: {
     fontSize: 11,

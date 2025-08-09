@@ -1,10 +1,11 @@
 import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, FlatList } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import createPdfProfitLoss from '../tools/createPdfProfitLoss';
+import createExcelProfitLoss from '../tools/createExcelProfitLoss';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import BackIcon from '../components/BackIcon';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const formatDateToYyyyMmDd = (date) => {
   const year = date.getFullYear();
@@ -42,6 +43,16 @@ const ProfitLossReports = ({ route }) => {
   const [startDate, setStartDate] = useState(getMonthDateRange().startDate);
   const [endDate, setEndDate] = useState(getMonthDateRange().endDate);
 
+  const [pageColor, setPageColor] = useState('#fef2f2');
+
+  useEffect(() => {
+    if (currentRole === '1') {
+      setPageColor('#e6f9ed'); // Toko hijau
+    } else if (currentRole === '2') {
+      setPageColor('#f3e8ff'); // Gudang ungu
+    }
+  }, [currentRole]);
+
   const fetchExistingReports = async () => {
     setLoading(true);
     setError(null);
@@ -72,13 +83,13 @@ const ProfitLossReports = ({ route }) => {
       const reportData = response.data;
 
       const periode = { place, startDate, endDate };
-      const pdfRawString = createPdfProfitLoss(reportData, periode);
+      const excelBase64 = createExcelProfitLoss(reportData, periode);
 
-      const documentsPath = ReactNativeBlobUtil.fs.dirs.DownloadDir;
-      const fileName = `LabaRugi-${periode.place}-${periode.endDate}.pdf`;
+      const documentsPath = ReactNativeBlobUtil.fs.dirs.DocumentDir;
+      const fileName = `LabaRugi-Bulanan-${periode.place} (${periode.startDate} hingga ${periode.endDate}).xlsx`;
       const finalPath = `${documentsPath}/${fileName}`;
 
-      await ReactNativeBlobUtil.fs.writeFile(finalPath, pdfRawString, 'utf8');
+      await ReactNativeBlobUtil.fs.writeFile(finalPath, excelBase64, 'base64');
       setSavedFilePath(finalPath);
 
       await axios.post('http://localhost:3000/reports/reports', {
@@ -95,9 +106,9 @@ const ProfitLossReports = ({ route }) => {
       if (err.response?.status === 409) {
         fetchExistingReports();
       } else {
-        const errorMessage = err.response?.data?.message || err.message || 'Terjadi kesalahan tidak diketahui.';
+        const errorMessage = err.response?.data?.message || err.message || 'Unknown error occurred.';
         setError(errorMessage);
-        Alert.alert('Gagal', errorMessage);
+        Alert.alert('Error', errorMessage);
       }
     } finally {
       setLoading(false);
@@ -105,7 +116,19 @@ const ProfitLossReports = ({ route }) => {
   };
 
   useEffect(() => {
-    handleCreateReport();
+    const checkFetchStatus = async () => {
+      let today = new Date().toISOString().split('T')[0];
+      let fetchStatus = await AsyncStorage.getItem('profitLoss');
+
+      if (fetchStatus !== today) {
+        handleCreateReport();
+        
+        await AsyncStorage.setItem('profitLoss', today);
+      }
+    };
+    
+    fetchExistingReports();
+    checkFetchStatus();
   }, []);
 
   const renderReportItem = ({ item }) => {
@@ -113,7 +136,7 @@ const ProfitLossReports = ({ route }) => {
     return (
       <View style={styles.reportItem}>
         <Text style={styles.reportText}>
-          Periode: {new Date(item.start_date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})} - {new Date(item.end_date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}
+          Periode: {new Date(item.start_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} - {new Date(item.end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
         </Text>
         <Text selectable={true} style={styles.pathTextSmall}>
           {item.pdf_path}
@@ -123,7 +146,7 @@ const ProfitLossReports = ({ route }) => {
   };
 
   return (
-    <View style={styles.pageContainer}>
+    <View style={[styles.pageContainer, { backgroundColor: pageColor }]}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate("Reports", { role: currentRole })}>
         <BackIcon />
       </TouchableOpacity>
@@ -160,7 +183,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#991b1b',
+    color: '#1a365d',
     textAlign: 'center',
     marginTop: 40,
     marginBottom: 20,
@@ -168,7 +191,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#7f1d1d',
+    color: '#1a365d',
     marginBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#fca5a5',
@@ -204,13 +227,13 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 14,
-    color: '#7f1d1d',
+    color: '#1a365d',
     textAlign: 'center',
     marginBottom: 15,
   },
   errorText: {
     fontSize: 14,
-    color: '#dc2626',
+    color: '#1a365d',
     textAlign: 'center',
     marginVertical: 10,
   },
@@ -243,6 +266,6 @@ const styles = StyleSheet.create({
   },
   reportText: {
     fontSize: 14,
-    color: '#991b1b',
+    color: '#1a365d',
   },
 });

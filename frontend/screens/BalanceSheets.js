@@ -1,11 +1,12 @@
 import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, FlatList, ScrollView } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import createPdfBalanceSheets from '../tools/createPdfBalanceSheets';
+import createExcelBalanceSheets from '../tools/createExcelBalanceSheets';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import BackIcon from '../components/BackIcon';
 import { useNavigation } from '@react-navigation/native';
 import { Calendar } from 'react-native-calendars';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const formatDateToYyyyMmDd = (date) => {
   const year = date.getFullYear();
@@ -37,6 +38,15 @@ const BalanceSheets = ({ route }) => {
   const [existingReports, setExistingReports] = useState([]);
 
   const [asOfDate, setAsOfDate] = useState(formatDateToYyyyMmDd(new Date()));
+  const [pageColor, setPageColor] = useState('#f0f9ff');
+
+  useEffect(() => {
+    if (currentRole === '1') {
+      setPageColor('#e6f9ed');
+    } else if (currentRole === '2') {
+      setPageColor('#f3e8ff');
+    }
+  }, [currentRole]);
 
   const fetchExistingReports = async () => {
     setLoading(true);
@@ -63,19 +73,19 @@ const BalanceSheets = ({ route }) => {
         params: { startDate, endDate, place }
       });
       const reportData = response.data;
-      const pdfRawString = createPdfBalanceSheets(reportData, { place, asOfDate: endDate });
+      const excelBase64 = createExcelBalanceSheets(reportData, { place, startDate, endDate });
 
-      const documentsPath = ReactNativeBlobUtil.fs.dirs.DownloadDir;
-      const fileName = `Neraca-Bulanan-${place}-${endDate}.pdf`;
+      const documentsPath = ReactNativeBlobUtil.fs.dirs.DocumentDir;
+      const fileName = `Neraca-Bulanan-${place} (${startDate} hingga ${endDate}).xlsx`;
       const finalPath = `${documentsPath}/${fileName}`;
 
-      await ReactNativeBlobUtil.fs.writeFile(finalPath, pdfRawString, 'utf8');
+      await ReactNativeBlobUtil.fs.writeFile(finalPath, excelBase64, 'base64');
 
       const closingBalances = {
         kas: reportData.aset.kas, inventaris: reportData.aset.inventaris,
         piutang: reportData.aset.piutang, utang: reportData.liabilitas.utang,
         labaDitahan: reportData.ekuitas.labaDitahan, peralatan: reportData.aset.peralatan,
-        perlengkapan: reportData.aset.perlengkapan, modal: reportData.ekuitas.modal
+        modal: reportData.ekuitas.modal
       };
 
       await axios.post('http://localhost:3000/reports/reports', {
@@ -102,19 +112,19 @@ const BalanceSheets = ({ route }) => {
         params: { asOfDate, place }
       });
       const reportData = response.data;
-      const pdfRawString = createPdfBalanceSheets(reportData, { place, asOfDate });
+      const excelBase64 = createExcelBalanceSheets(reportData, { place, asOfDate });
 
-      const documentsPath = ReactNativeBlobUtil.fs.dirs.DownloadDir;
-      const fileName = `Neraca-${place}-${asOfDate}.pdf`;
+      const documentsPath = ReactNativeBlobUtil.fs.dirs.DocumentDir;
+      const fileName = `Neraca-${place} (per tanggal ${asOfDate}).xlsx`;
       const finalPath = `${documentsPath}/${fileName}`;
 
-      await ReactNativeBlobUtil.fs.writeFile(finalPath, pdfRawString, 'utf8');
+      await ReactNativeBlobUtil.fs.writeFile(finalPath, excelBase64, 'base64');
 
       const closingBalances = {
         kas: reportData.aset.kas, inventaris: reportData.aset.inventaris,
         piutang: reportData.aset.piutang, utang: reportData.liabilitas.utang,
         labaDitahan: reportData.ekuitas.labaDitahan, peralatan: reportData.aset.peralatan,
-        perlengkapan: reportData.aset.perlengkapan, modal: reportData.ekuitas.modal
+        modal: reportData.ekuitas.modal
       };
 
       await axios.post('http://localhost:3000/reports/reports', {
@@ -124,15 +134,26 @@ const BalanceSheets = ({ route }) => {
 
       fetchExistingReports();
     } catch (err) {
-      Alert.alert("Error", err);
+      console.log(err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    const checkFetchStatus = async () => {
+      let today = new Date().toISOString().split('T')[0];
+      let fetchStatus = await AsyncStorage.getItem('balanceSheet');
+
+      if (fetchStatus !== today) {
+        handleCreateMonthlyReport();
+        
+        await AsyncStorage.setItem('balanceSheet', today);
+      }
+    };
+    
     fetchExistingReports();
-    handleCreateMonthlyReport();
+    checkFetchStatus();
   }, []);
 
   const renderReportItem = ({ item }) => (
@@ -151,7 +172,7 @@ const BalanceSheets = ({ route }) => {
   );
 
   return (
-    <View style={styles.pageContainer}>
+    <View style={[styles.pageContainer, { backgroundColor: pageColor }]}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate("Reports", { role: currentRole })}>
         <BackIcon />
       </TouchableOpacity>
@@ -209,7 +230,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1e40af',
+    color: '#1a365d',
     textAlign: 'center',
     marginTop: 40,
     marginBottom: 20
@@ -217,7 +238,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e40af',
+    color: '#1a365d',
     marginBottom: 10
   },
   creationContainer: {
@@ -260,13 +281,13 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 14,
-    color: '#1e40af',
+    color: '#1a365d',
     textAlign: 'center',
     marginVertical: 15
   },
   errorText: {
     fontSize: 14,
-    color: '#dc2626',
+    color: '#1a365d',
     textAlign: 'center',
     marginVertical: 10
   },
@@ -289,6 +310,6 @@ const styles = StyleSheet.create({
   },
   reportText: {
     fontSize: 14,
-    color: '#1e40af'
+    color: '#1a365d',
   },
 });

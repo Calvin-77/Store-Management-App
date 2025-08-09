@@ -7,8 +7,15 @@ function calculateProfitForPeriod(transactionRows) {
     transactionRows.forEach(row => {
         const total = parseFloat(row.nominal);
         switch (row.type) {
-            case 'Penjualan': result.pendapatan += total; break;
-            case 'Stok Keluar': result.hpp += total; break;
+            case 'Penjualan':
+            case 'Piutang':
+                result.pendapatan += total;
+                break;
+
+            case 'Stok Keluar':
+                result.hpp += total;
+                break;
+                
             case 'Beban Gaji Staff':
             case 'Beban Bonus Staff':
             case 'Uang Makan Staff':
@@ -28,17 +35,30 @@ function calculateCashFlowForPeriod(transactionRows) {
     transactionRows.forEach(row => {
         const total = parseFloat(row.nominal);
         switch (row.type) {
-            case 'Penjualan': case 'Pembayaran Piutang': case 'Modal': case 'Utang':
-                totalMasuk += total; break;
-            case 'Stok Masuk': case 'Beban Gaji Staff': case 'Beban Bonus Staff':
-            case 'Uang Makan Staff': case 'Perlengkapan': case 'Biaya Lain Lain':
-            case 'Peralatan': case 'Pembayaran Utang':
-                totalKeluar += total; break;
+            case 'Penjualan':
+            case 'Pembayaran Piutang':
+            case 'Modal':
+            case 'Utang':
+                totalMasuk += total;
+                break;
+                
+            case 'Stok Masuk':
+            case 'Beban Gaji Staff':
+            case 'Beban Bonus Staff':
+            case 'Uang Makan Staff':
+            case 'Biaya Lain Lain':
+            case 'Peralatan':
+            case 'Perlengkapan':
+            case 'Pembayaran Utang':
+                totalKeluar += total;
+                break;
         }
     });
     return totalMasuk - totalKeluar;
 }
 
+
+// memasukkan transaksi baru
 router.post('/', async (req, res) => {
     const { type, name, product_name, description, place, quantity, unit, nominal } = req.body;
 
@@ -55,6 +75,7 @@ router.post('/', async (req, res) => {
     }
 });
 
+// memasukkan laporan baru yang sudah dibuat
 router.post('/reports', async (req, res) => {
     const { report_type, place, startDate, endDate, asOfDate, pdf_path, closingBalances } = req.body;
 
@@ -70,8 +91,8 @@ router.post('/reports', async (req, res) => {
             INSERT INTO reports (
                 report_type, place, start_date, end_date, as_of_date, pdf_path, status,
                 closing_cash, closing_inventory, closing_receivables, closing_payables, 
-                closing_retained_earnings, closing_equipment, closing_supplies, closing_modal
-            ) VALUES (?, ?, ?, ?, ?, ?, 'final', ?, ?, ?, ?, ?, ?, ?, ?)
+                closing_retained_earnings, closing_equipment, closing_modal
+            ) VALUES (?, ?, ?, ?, ?, ?, 'final', ?, ?, ?, ?, ?, ?, ?)
         `;
         const values = [
             report_type, place, startDate || null, endDate || null, asOfDate || null, pdf_path,
@@ -81,7 +102,6 @@ router.post('/reports', async (req, res) => {
             closingBalances?.utang || 0,
             closingBalances?.labaDitahan || 0,
             closingBalances?.peralatan || 0,
-            closingBalances?.perlengkapan || 0,
             closingBalances?.modal || 0
         ];
         await connection.promise().query(query, values);
@@ -92,6 +112,7 @@ router.post('/reports', async (req, res) => {
     }
 });
 
+// mengambil daftar laporan yang sudah dibuat
 router.get('/reports', async (req, res) => {
     const { report_type, place } = req.query;
     try {
@@ -209,20 +230,17 @@ router.get('/balance-sheet', async (req, res) => {
 
         const lastReportQuery = `
             SELECT as_of_date, closing_cash, closing_inventory, closing_receivables, 
-                   closing_payables, closing_retained_earnings, closing_equipment, closing_supplies, closing_modal
+                   closing_payables, closing_retained_earnings, closing_equipment, closing_modal
             FROM reports
             WHERE report_type = 'balance-sheet' AND place = ? AND as_of_date < ? AND status = 'final'
-            ORDER BY as_of_date DESC
-            LIMIT 1
+            ORDER BY as_of_date DESC LIMIT 1
         `;
-
         const [lastReports] = await connection.promise().query(lastReportQuery, [place, asOfDate]);
 
         let saldoAwal = {
             kas: 0, inventaris: 0, piutang: 0, utang: 0, modal: 0,
-            labaDitahan: 0, peralatan: 0, perlengkapan: 0
+            labaDitahan: 0, peralatan: 0
         };
-
         let startDate = '1970-01-01';
 
         if (lastReports.length > 0) {
@@ -235,7 +253,6 @@ router.get('/balance-sheet', async (req, res) => {
                 modal: parseFloat(last.closing_modal || 0),
                 labaDitahan: parseFloat(last.closing_retained_earnings || 0),
                 peralatan: parseFloat(last.closing_equipment || 0),
-                perlengkapan: parseFloat(last.closing_supplies || 0)
             };
             let lastDate = new Date(last.as_of_date);
             lastDate.setDate(lastDate.getDate() + 1);
@@ -250,7 +267,6 @@ router.get('/balance-sheet', async (req, res) => {
         
         const periodSum = {};
         periodSumRows.forEach(r => periodSum[r.type] = parseFloat(r.total));
-
         const perubahanKas = calculateCashFlowForPeriod(periodRows);
         const profitPeriodeIni = calculateProfitForPeriod(periodRows);
 
@@ -261,15 +277,14 @@ router.get('/balance-sheet', async (req, res) => {
         const saldoAkhirInventaris = saldoAwal.inventaris + (periodSum['Stok Masuk'] || 0) - (profitPeriodeIni.hpp);
         const saldoAkhirLabaDitahan = saldoAwal.labaDitahan + profitPeriodeIni.labaBersih;
         const saldoAkhirPeralatan = saldoAwal.peralatan + (periodSum['Peralatan'] || 0);
-        const saldoAkhirPerlengkapan = saldoAwal.perlengkapan + (periodSum['Perlengkapan'] || 0);
         
-        const totalAset = saldoAkhirKas + saldoAkhirPiutang + saldoAkhirPeralatan + saldoAkhirPerlengkapan + saldoAkhirInventaris;
+        const totalAset = saldoAkhirKas + saldoAkhirPiutang + saldoAkhirPeralatan + saldoAkhirInventaris;
         const totalLiabilitas = saldoAkhirUtang;
         const totalEkuitas = saldoAkhirModal + saldoAkhirLabaDitahan;
         
         res.json({
             asOfDate,
-            aset: { kas: saldoAkhirKas, piutang: saldoAkhirPiutang, peralatan: saldoAkhirPeralatan, perlengkapan: saldoAkhirPerlengkapan, inventaris: saldoAkhirInventaris, total: totalAset },
+            aset: { kas: saldoAkhirKas, piutang: saldoAkhirPiutang, peralatan: saldoAkhirPeralatan, inventaris: saldoAkhirInventaris, total: totalAset },
             liabilitas: { utang: saldoAkhirUtang, total: totalLiabilitas },
             ekuitas: { modal: saldoAkhirModal, labaDitahan: saldoAkhirLabaDitahan, total: totalEkuitas },
             check: { totalAset, totalLiabilitasDanEkuitas: totalLiabilitas + totalEkuitas, selisih: totalAset - (totalLiabilitas + totalEkuitas) },
@@ -290,14 +305,13 @@ router.get('/balance-sheet/period', async (req, res) => {
     try {
         const checkQuery = `SELECT * FROM reports WHERE report_type = 'balance-sheet' AND place = ? AND as_of_date = ? AND status = 'final'`;
         const [existingReports] = await connection.promise().query(checkQuery, [place, endDate]);
-
         if (existingReports.length > 0) {
             return res.status(409).json({ message: `Laporan Neraca per tanggal ${endDate} di ${place} sudah pernah dibuat.`, data: existingReports[0] });
         }
 
         const lastReportQuery = `
             SELECT as_of_date, closing_cash, closing_inventory, closing_receivables, 
-                   closing_payables, closing_retained_earnings, closing_equipment, closing_supplies, closing_modal
+                   closing_payables, closing_retained_earnings, closing_equipment, closing_modal
             FROM reports
             WHERE report_type = 'balance-sheet' AND place = ? AND as_of_date < ? AND status = 'final'
             ORDER BY as_of_date DESC
@@ -307,7 +321,7 @@ router.get('/balance-sheet/period', async (req, res) => {
 
         let saldoAwal = {
             kas: 0, inventaris: 0, piutang: 0, utang: 0, modal: 0,
-            labaDitahan: 0, peralatan: 0, perlengkapan: 0
+            labaDitahan: 0, peralatan: 0
         };
         
         let startCalculationDate = '1970-01-01';
@@ -322,7 +336,6 @@ router.get('/balance-sheet/period', async (req, res) => {
                 modal: parseFloat(last.closing_modal || 0),
                 labaDitahan: parseFloat(last.closing_retained_earnings || 0),
                 peralatan: parseFloat(last.closing_equipment || 0),
-                perlengkapan: parseFloat(last.closing_supplies || 0)
             };
             let lastDate = new Date(last.as_of_date);
             lastDate.setDate(lastDate.getDate() + 1);
@@ -337,7 +350,6 @@ router.get('/balance-sheet/period', async (req, res) => {
         
         const periodSum = {};
         periodSumRows.forEach(r => periodSum[r.type] = parseFloat(r.total));
-
         const perubahanKas = calculateCashFlowForPeriod(periodRows);
         const profitPeriodeIni = calculateProfitForPeriod(periodRows);
 
@@ -348,15 +360,14 @@ router.get('/balance-sheet/period', async (req, res) => {
         const saldoAkhirInventaris = saldoAwal.inventaris + (periodSum['Stok Masuk'] || 0) - (profitPeriodeIni.hpp);
         const saldoAkhirLabaDitahan = saldoAwal.labaDitahan + profitPeriodeIni.labaBersih;
         const saldoAkhirPeralatan = saldoAwal.peralatan + (periodSum['Peralatan'] || 0);
-        const saldoAkhirPerlengkapan = saldoAwal.perlengkapan + (periodSum['Perlengkapan'] || 0);
         
-        const totalAset = saldoAkhirKas + saldoAkhirPiutang + saldoAkhirPeralatan + saldoAkhirPerlengkapan + saldoAkhirInventaris;
+        const totalAset = saldoAkhirKas + saldoAkhirPiutang + saldoAkhirPeralatan + saldoAkhirInventaris;
         const totalLiabilitas = saldoAkhirUtang;
         const totalEkuitas = saldoAkhirModal + saldoAkhirLabaDitahan;
         
         res.json({
             asOfDate: endDate,
-            aset: { kas: saldoAkhirKas, piutang: saldoAkhirPiutang, peralatan: saldoAkhirPeralatan, perlengkapan: saldoAkhirPerlengkapan, inventaris: saldoAkhirInventaris, total: totalAset },
+            aset: { kas: saldoAkhirKas, piutang: saldoAkhirPiutang, peralatan: saldoAkhirPeralatan, inventaris: saldoAkhirInventaris, total: totalAset },
             liabilitas: { utang: saldoAkhirUtang, total: totalLiabilitas },
             ekuitas: { modal: saldoAkhirModal, labaDitahan: saldoAkhirLabaDitahan, total: totalEkuitas },
             check: { totalAset, totalLiabilitasDanEkuitas: totalLiabilitas + totalEkuitas, selisih: totalAset - (totalLiabilitas + totalEkuitas) },

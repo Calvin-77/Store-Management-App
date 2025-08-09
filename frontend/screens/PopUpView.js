@@ -55,7 +55,7 @@ const PopUpView = ({ onClose }) => {
                 setData(response.data);
             } catch (error) {
                 console.error('Error fetching data:', error);
-                Alert.alert('Error', 'Gagal memuat data produk.');
+                Alert.alert('Error', 'Failed to load products.');
             } finally {
                 setIsLoading(false);
             }
@@ -140,11 +140,11 @@ const PopUpView = ({ onClose }) => {
                                         });
                                     }
 
-                                    Alert.alert("Sukses", `Barang "${values.name}" berhasil ditambahkan!`);
+                                    Alert.alert("Success", `Product "${values.name}" has been added successfully!`);
                                     resetForm();
                                     onClose();
                                 } catch (error) {
-                                    Alert.alert('Error', 'Gagal menambahkan barang. Silakan coba lagi.');
+                                    Alert.alert('Error', 'Failed to add product. Please try again.');
                                 }
                             }}
                         >
@@ -153,7 +153,7 @@ const PopUpView = ({ onClose }) => {
                                     const isKgToGram = values.baseUnit === 'Gram' && values.units.includes('Kg');
 
                                     if (isKgToGram) {
-                                        setFieldValue('conversions.Kg', '1000'); // ini adalah fungsi dari formik, untuk mengatur nilai dalam form
+                                        setFieldValue('conversions.Kg', '1000');
                                     }
                                 }, [values.units, values.baseUnit, setFieldValue]);
 
