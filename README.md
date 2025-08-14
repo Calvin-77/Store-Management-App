@@ -23,29 +23,83 @@ A **React Native Windows** application designed to help users efficiently manage
 - [React Native CLI](https://reactnative.dev/docs/environment-setup)
 - [Windows 10/11](https://reactnative.dev/docs/running-on-windows) (for running the app as a Windows application)
 - [Visual Studio](https://visualstudio.microsoft.com/) with UWP development workload (required for React Native Windows)
+- [MySQL](https://www.mysql.com/) or [MariaDB](https://mariadb.org/) (for backend database)
 
 ## Getting Started
 
-1. **Clone the Repository**
-    ```sh
-    git clone https://github.com/Calvin-77/Management-App.git
-    cd Management-App
-    ```
+### 1. Clone the Repository
 
-2. **Install Dependencies**
-    ```sh
-    npm install
-    ```
+```sh
+git clone https://github.com/Calvin-77/Management-App.git
+cd Management-App
+```
 
-3. **Install React Native Windows (if not already installed)**
-    ```sh
-    npx react-native-windows-init --overwrite
-    ```
+### 2. Setup the Backend
+
+1. **Install Backend Dependencies**
+
+   Navigate to the backend directory (e.g., `backend/`) and install dependencies:
+
+   ```sh
+   cd backend
+   npm install
+   ```
+
+2. **Configure Database Connection**
+
+   - Set your database credentials (host, user, password, database name).
+
+3. **Import the SQL Schema**
+
+   - Find the provided SQL file in the repository.
+   - Use your MySQL client or CLI to import it:
+
+     ```sh
+     mysql -u <username> -p <database_name> < path/to/schema.sql
+     ```
+
+   - This will create all necessary tables and seed initial data.
+
+4. **Start the Backend Server**
+
+   ```sh
+   npm start
+   ```
+
+   By default, the backend runs on [http://localhost:5000](http://localhost:5000) (check your backend config).
+
+### 3. Setup the Frontend
+
+1. **Install Frontend Dependencies**
+
+   Navigate back to the main project directory if needed:
+
+   ```sh
+   cd ../  # if you're still in backend/
+   npm install
+   ```
+
+2. **Install React Native Windows (if not already installed)**
+
+   ```sh
+   npx react-native-windows-init --overwrite
+   ```
+
+3. **Configure API Endpoint**
+
+   - If your frontend needs to know the backend URL, update the configuration (e.g., `src/config.js` or environment files) to point to your backend server (e.g., `http://localhost:5000`).
 
 4. **Run the App on Windows**
-    ```sh
-    npx react-native run-windows
-    ```
+
+   ```sh
+   npx react-native run-windows
+   ```
+
+### 4. Connect Frontend to Backend
+
+- Ensure the backend server is running before starting the frontend.
+- The frontend will communicate with the backend via REST API endpoints for data operations (inventory, reports, accounts, etc.).
+- If needed, update CORS and API URLs in backend or frontend config files.
 
 ## Usage
 
@@ -60,6 +114,8 @@ A **React Native Windows** application designed to help users efficiently manage
 - `src/pages/ProfitLoss.js` - Profit & Loss report generation.
 - `src/pages/CashFlow.js` - Cash Flow report generation.
 - `src/components/` - Reusable UI components.
+- `backend/` - Backend server, API routes, and database logic.
+- `database.sql` or `schema.sql` - SQL schema for database setup.
 
 ## Contributing
 
