@@ -1,7 +1,6 @@
 /backend/node_modules
 /frontend2/node_modules
 
-/backend/bin
 /frontend2/android/build
 /frontend2/ios/build
 /frontend2/windows/build
