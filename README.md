@@ -1,4 +1,4 @@
-# Management-App
+# Store-Management-App
 
 A **React Native Windows** application designed to help users efficiently manage stores and storage locations, track inventory, and handle financial accounts. The app features automated report generation with downloadable Excel files, providing an all-in-one solution for store management on Windows devices.
 
